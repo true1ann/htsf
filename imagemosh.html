@@ -17,7 +17,7 @@
         * { margin: 0; padding: 0; box-sizing: border-box; color: var(--textground); }
         body { font-family: system-ui, -apple-system, sans-serif; background: var(--background); overflow: hidden; }
         #app { display: grid; grid-template-columns: 50% 50%; height: 100vh; position: relative; }
-        #p_left { display: flex; flex-direction: column; overflow: hidden; }
+        #p_left { display: flex; flex-direction: column; overflow: hidden; container-type: inline-size; container-name: left-panel; }
         #p_right { display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; padding: 20px; }
         #p_left > div:first-child, #p_left > div:last-child { padding: 15px; }
         #p_left > div:first-child { padding-bottom: 0px; }
@@ -25,12 +25,16 @@
         #f_list { max-height: 0; overflow: hidden; transition: max-height 0.3s, padding-top 0.25s; display: flex; flex-direction: column; gap: 5px; }
         #f_list.expanded { padding-top: 15px; max-height: 50vh; overflow-y: auto; }
         .filter-item { display: flex; align-items: center; gap: 8px; padding: 10px; background: var(--foreground); border-radius: var(--roundness); }
-        .filter-item input[type="text"] { flex: 1; background: var(--background); padding: 5px 10px; border: none; border-radius: calc(var(--roundness) - 10px); }
+        .drag-handle { cursor: grab; user-select: none; display: inline-flex; align-items: center; justify-content: center;}
+        .filter-item > * { flex: 0.5; }
+        .filter-item input[type="text"] { flex: 9; background: var(--background); padding: 5px 10px; border: none; border-radius: calc(var(--roundness) - 10px); }
         #e_container { flex: 1; display: flex; flex-direction: column; padding: 15px; padding-top: 5px; overflow: hidden; background: var(--background); }
         #e_container > div:first-child { margin-bottom: 5px; font-size: 12px; }
         #e { flex: 1; background: var(--foreground); color: var(--inputground); border: none; padding: 15px; font-family: monospace; font-size: 14px; resize: none; border-radius: var(--roundness); outline: none; }
-        .button-row { display: flex; border-radius: var(--roundness); overflow: hidden; }
+        .dynamic-row, .static-row { display: flex; border-radius: var(--roundness); overflow: hidden; }
+        .static-row { border-radius: 0; flex: 1; }
         button, #f_select { padding: 12px; background: var(--foreground); border: none; cursor: pointer; font-size: 14px; flex: 1; min-width: 0; }
+        .row-span { padding: 12px; flex: none; background-color: var(--accent); color: var(--background); font-size: 14px; min-width: 0; display: inline-flex; align-items: center; filter: grayscale(0.5); }
         #f_select { background: var(--accent); color: var(--background); text-align-last: center; text-align: center; appearance: none; -webkit-appearance: none; -moz-appearance: none; }
         button:hover:not(:disabled) { filter:invert(0.1) }
         button:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -50,9 +54,12 @@
             body { overflow-y: auto; }
             #app { display: flex; flex-direction: column; height: auto; min-height: 100vh; }
             #resizer { display: none; }
-            #p_right { width: 100%; order: 1; border-bottom: 5px solid var(--resizer);}
+            #p_right { width: 100%; order: 1; border-bottom: 5px solid var(--resizer); }
             #p_left { width: 100%; min-height: 100vh; order: 2; border-right: none; }
-            .button-row { flex-direction: column; }
+            .drag-handle { display: none; }
+        }
+        @container left-panel (max-width: 450px) {
+            .dynamic-row { flex-direction: column; }
         }
     </style>
 </head>
@@ -61,13 +68,19 @@
         <div id="resizer"></div>
         <div id="p_left">
             <div>
-                <div class="button-row">
-                    <select id="f_select"></select>
-                    <button id="f_new" title="Add (new)">Add (new)</button>
-                    <button id="f_import" title="Add (file)">Add (file)</button>
-                    <button id="f_ck" title="Remove">Remove</button>
-                    <button id="f_export" title="Export">Export</button>
-                    <button id="f_manager" title="Open Filter Manager">☰</button>
+                <div class="dynamic-row">
+                    <div class="static-row">
+                        <select id="f_select"></select>
+                        <button id="f_manager" title="Open Filter Manager">☰</button>
+                    </div>
+                    <div class="static-row">
+                        <button id="f_new" title="Add new filter">+</button>
+                        <button id="f_ck" title="Remove filter">-</button>
+                        <button id="f_import" title="Import filters from a file">⤓</button>
+                        <button id="f_export" title="Export filter to a file">⤒</button>
+                        <button id="f_up" title="Move filter up" onclick="moveFilterUp(currentFilterIdx)">▲</button>
+                        <button id="f_down" title="Move filter down" onclick="moveFilterDown(currentFilterIdx)">▼</button>
+                    </div>
                 </div>
                 <div id="f_list"></div>
             </div>
@@ -80,12 +93,19 @@
             </div>
 
             <div>
-                <div class="button-row">
-                    <button id="c_clear" disabled>Clear</button>
-                    <button id="c_reset" disabled>Reset</button>
-                    <button id="c_apply" disabled>Apply</button>
-                    <button id="c_export">Export All</button>
-                    <button id="c_replace">Replace All</button>
+                <div class="dynamic-row">
+                    <div class="static-row">
+                        <span class="row-span">Canvas:</span>
+                        <button id="c_clear" disabled>🗑</button>
+                        <button id="c_reset" disabled>↻</button>
+                        <button id="c_apply" disabled>▶</button>
+                    </div>
+                    <div class="static-row">
+                        <span class="row-span">All filters:</span>
+                        <button id="c_export">⤒</button>
+                        <button id="c_replace">⤓</button>
+                    </div>
+
                 </div>
             </div>
         </div>
@@ -97,7 +117,7 @@
             </div>
             <div id="canvas-create-ui">
                 <input type="text" id="canvas_dims" placeholder="WxH" value="512x512">
-                <button id="canvas_new">New</button>
+                <button id="canvas_new">+</button>
             </div>
             <canvas id="canvas" style="display: none;"></canvas>
         </div>
@@ -135,7 +155,7 @@
                 item.className = 'filter-item';
                 item.draggable = true;
                 item.dataset.idx = idx;
-                item.innerHTML = `<span class="drag-handle">☰</span><input type="checkbox" ${f.on ? 'checked' : ''}><input type="text" value="${f.name}">`;
+                item.innerHTML = `<input type="checkbox" ${f.on ? 'checked' : ''}><input type="text" value="${f.name}"><span class="drag-handle">☰</span>`;
                 
                 const checkbox = item.querySelector('input[type="checkbox"]');
                 checkbox.addEventListener('change', () => f.on = checkbox.checked);
@@ -465,6 +485,24 @@
         });
 
         window.addEventListener('beforeunload', () => activeBlobURLs.forEach(url => URL.revokeObjectURL(url)));
+
+        const moveFilterUp = (idx) => {
+            if (idx <= 0) return;
+            const currentFilterName = filters[currentFilterIdx].name;
+            [filters[idx - 1], filters[idx]] = [filters[idx], filters[idx - 1]];
+            currentFilterIdx = filters.findIndex(f => f.name === currentFilterName);
+            updateFilterSelect();
+            updateFilterList();
+        };
+
+        const moveFilterDown = (idx) => {
+            if (idx >= filters.length - 1) return;
+            const currentFilterName = filters[currentFilterIdx].name;
+            [filters[idx], filters[idx + 1]] = [filters[idx + 1], filters[idx]];
+            currentFilterIdx = filters.findIndex(f => f.name === currentFilterName);
+            updateFilterSelect();
+            updateFilterList();
+        };
     </script>
 </body>
 </html>
