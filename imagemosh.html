@@ -40,7 +40,8 @@
         #canvas-create-ui { display: flex; border-radius: var(--roundness); overflow: hidden; }
         #canvas-create-ui input { background: var(--foreground); color: var(--inputground);border: none; padding: 8px 12px; outline: none; width: 100px; }
         #canvas-create-ui button { background: var(--accent); color: var(--background); flex: none; padding: 8px 16px; }
-        #canvas { max-width: 100%; max-height: 100%; image-rendering: pixelated; }
+        #canvas-create-ui.hidden { display: none; }
+        #canvas { max-width: 100%; max-height: 100%; image-rendering: pixelated; border-radius: var(--roundness);}
         @media (min-width: 769px) {
             #resizer { position: absolute; left: 50%; width: 4px; height: 100%; background: var(--resizer); cursor: col-resize; transform: translateX(-2px); z-index: 1000; }
             #resizer:hover { background: var(--accent); }
