@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Mosh</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            overflow: hidden;
+        }
+
+        #app {
+            display: grid;
+            grid-template-columns: 50% 50%;
+            height: 100vh;
+            position: relative;
+        }
+
+        #resizer {
+            position: absolute;
+            left: 50%;
+            top: 0;
+            width: 4px;
+            height: 100%;
+            background: #333;
+            cursor: col-resize;
+            transform: translateX(-2px);
+            z-index: 1000;
+        }
+
+        #resizer:hover {
+            background: #555;
+        }
+
+        #p_left {
+            display: flex;
+            flex-direction: column;
+            background: #222;
+            border-right: 1px solid #333;
+            overflow: hidden;
+        }
+
+        #p_left > div:first-child {
+            background: #1a1a1a;
+            border-bottom: 1px solid #333;
+        }
+
+        #p_left > *:first-child,
+        #p_left > *:last-child {
+            padding:15px;
+        }
+
+        #f_list {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s, padding-top 0.25s;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        #f_list.expanded {
+            padding-top: 15px;
+            max-height: 50vh;
+            overflow-y: auto;
+        }
+
+        .filter-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            background: #2a2a2a;
+            cursor: move;
+            border-radius: 4px;
+        }
+
+        .filter-item input[type="checkbox"] {
+            cursor: pointer;
+        }
+
+        .filter-item input[type="text"] {
+            flex: 1;
+            background: #1a1a1a;
+            border: 1px solid #444;
+            color: #e0e0e0;
+            padding: 4px 8px;
+            border-radius: 3px;
+        }
+
+        .filter-item .drag-handle {
+            color: #666;
+            cursor: move;
+        }
+
+        #e_container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 15px;
+            overflow: hidden;
+        }
+
+        #e_container > div:first-child {
+            margin-bottom: 8px;
+            font-size: 12px;
+            color: #888;
+        }
+
+        #e {
+            flex: 1;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            color: #e0e0e0;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            resize: none;
+            border-radius: 4px;
+        }
+
+        #e:focus {
+            outline: none;
+            border-color: #555;
+        }
+
+        .button-row {
+            display: flex;
+            background: #1a1a1a;
+            border-top: 1px solid #333;
+        }
+
+        button,
+        #f_select {
+            padding: 12px;
+            background: #333;
+            color: #e0e0e0;
+            border: none;
+            cursor: pointer;
+            font-family: system-ui, -apple-system, sans-serif;
+            font-size: 14px;
+            border-radius: 0px;
+        }
+
+        #f_select {
+            flex: 1;
+            background: #3a3a3a;
+        }
+
+        .button-row button {
+            flex: 1;
+        }
+
+        button:hover {
+            background: #444;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        #p_right {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #1a1a1a;
+            overflow: hidden;
+        }
+
+        #uz {
+            border: 2px dashed #555;
+            padding: 60px;
+            text-align: center;
+            cursor: pointer;
+            color: #888;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        #uz:hover {
+            border-color: #777;
+            color: #aaa;
+        }
+
+        #canvas-create-ui {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        #canvas-create-ui input {
+            background: #2a2a2a;
+            color: #e0e0e0;
+            border: 1px solid #444;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        #canvas-create-ui input:focus {
+            outline: none;
+            border-color: #555;
+        }
+
+        #canvas-create-ui button {
+            padding: 8px 16px;
+            flex-shrink: 0;
+            border-radius: 4px;
+        }
+
+        #canvas-create-ui.hidden {
+            display: none;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        #canvas {
+            max-width: 100%;
+            max-height: 100%;
+            display: block;
+            image-rendering: pixelated;
+        }
+
+        /* PC layout */
+        @media (min-width: 769px) {
+            .button-row button:first-child,
+            #f_select:first-child {
+                border-top-left-radius: 4px;
+                border-bottom-left-radius: 4px;
+            }
+            .button-row button:last-child {
+                border-top-right-radius: 4px;
+                border-bottom-right-radius: 4px;
+            }
+        }
+
+        /* Mobile layout */
+        @media (max-width: 768px) {
+            body {
+                overflow-y: auto;
+                overflow-x: hidden;
+            }
+
+            #app {
+                display: flex;
+                flex-direction: column;
+                height: auto;
+                min-height: 100vh;
+            }
+
+            #resizer {
+                display: none;
+            }
+
+            #p_right {
+                width: 100%;
+                min-height: 0vh;
+                order: 1;
+                padding: 15px;
+            }
+
+            #canvas {
+                max-width: 100%;
+                height: auto;
+                border-radius: 4px;
+            }
+
+            #p_left {
+                width: 100%;
+                min-height: 100vh;
+                order: 2;
+                border-right: none;
+                border-top: 1px solid #333;
+            }
+
+            #f_list.expanded {
+                max-height: none;
+            }
+
+            .button-row {
+                flex-direction: column;
+            }
+
+            .button-row button:first-child,
+            #f_select:first-child {
+                border-top-left-radius: 4px;
+                border-top-right-radius: 4px;
+            }
+            .button-row button:last-child {
+                border-bottom-left-radius: 4px;
+                border-bottom-right-radius: 4px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div id="resizer"></div>
+        <div id="p_left">
+            <div>
+                <div class="button-row">
+                    <select id="f_select"></select>
+                    <button id="f_new" title="Add (new)">Add (new)</button>
+                    <button id="f_import" title="Add (file)">Add (file)</button>
+                    <button id="f_ck" title="Remove">Remove</button>
+                    <button id="f_export" title="Export">Export</button>
+                    <button id="f_manager" title="Open Filter Manager">☰</button>
+                </div>
+                <div id="f_list"></div>
+            </div>
+
+            <div id="e_container">
+                <div>
+                    Defined: (r,g,b,a,x,y,w,h,i,p), put(r,g,b,a,x,y)
+                </div>
+                <textarea id="e" spellcheck="false"></textarea>
+            </div>
+
+            <div class="button-row">
+                <button id="c_clear" disabled>Clear</button>
+                <button id="c_reset" disabled>Reset</button>
+                <button id="c_apply" disabled>Apply</button>
+                <button id="c_export">Export All</button>
+                <button id="c_replace">Replace All</button>
+            </div>
+        </div>
+
+        <div id="p_right">
+            <div id="uz">
+                drag n drop here or click here
+                <input type="file" id="ui" accept="image/*">
+            </div>
+            <div id="canvas-create-ui">
+                <input type="text" id="canvas_dims" placeholder="WxH" value="512x512">
+                <button id="canvas_new">New</button>
+            </div>
+            <canvas id="canvas" style="display: none;"></canvas>
+        </div>
+    </div>
+
+    <script>
+        window.ui = {
+            uz: document.getElementById('uz'),                 // Upload zone
+            ui: document.getElementById('ui'),                 // Upload input
+            editor: document.getElementById('e'),              // Code editor
+            f_select: document.getElementById('f_select'),     // Filter select
+            f_list: document.getElementById('f_list'),         // Filter list
+            f_manager: document.getElementById('f_manager'),   // View all filters
+            f_new: document.getElementById('f_new'),           // New filter
+            f_import: document.getElementById('f_import'),     // Import filter
+            f_ck: document.getElementById('f_ck'),             // Remove filter
+            f_export: document.getElementById('f_export'),     // Export filter
+            c_clear: document.getElementById('c_clear'),       // Clear image
+            c_reset: document.getElementById('c_reset'),       // Reset image
+            c_apply: document.getElementById('c_apply'),       // Apply filters
+            c_export: document.getElementById('c_export'),     // Export all filters
+            c_replace: document.getElementById('c_replace'),   // Import all filters
+            canvas: document.getElementById('canvas'),         // Canvas
+            canvas_dims: document.getElementById('canvas_dims'), // Canvas dimensions input
+            canvas_new: document.getElementById('canvas_new'), // Create new canvas button
+            canvas_create_ui: document.getElementById('canvas-create-ui'), // Canvas creation UI
+        }
+
+        let originalImage = null
+        let originalImageData = null
+        let filters = [
+            {
+                name: 'Main',
+                on: true,
+                data: '// Place pixel at original position\nput(r, g, b, a, x, y);'
+            }
+        ]
+        let currentFilterIdx = 0
+        let listExpanded = false
+
+        // Initialize
+        updateFilterSelect()
+        updateFilterList()
+        loadFilterCode()
+
+        // File upload
+        window.ui.uz.addEventListener('click', () => window.ui.ui.click())
+        
+        window.ui.uz.addEventListener('dragover', (e) => e.preventDefault())
+
+        window.ui.uz.addEventListener('drop', (e) => {
+            e.preventDefault()
+            const file = e.dataTransfer.files[0]
+            if (file && file.type.startsWith('image/')) loadImage(file)
+        })
+
+        window.ui.ui.addEventListener('change', (e) => {
+            const file = e.target.files[0]
+            if (file) loadImage(file)
+        })
+
+        // Canvas creation
+        window.ui.canvas_new.addEventListener('click', () => {
+            const dims = window.ui.canvas_dims.value.split('x')
+            if (dims.length !== 2 || !dims[0] || !dims[1]) {
+                console.log('Invalid dimensions. Use format: WxH')
+                return
+            }
+            
+            const width = parseInt(dims[0])
+            const height = parseInt(dims[1])
+            
+            if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) {
+                console.log('Width and height must be positive integers')
+                return
+            }
+            
+            createBlankCanvas(width, height)
+        })
+
+        function createBlankCanvas(width, height) {
+            const canvas = document.createElement('canvas')
+            canvas.width = width
+            canvas.height = height
+            const ctx = canvas.getContext('2d')
+            
+            const imageData = ctx.createImageData(width, height)
+            for (let i = 0; i < imageData.data.length; i += 4) {
+                imageData.data[i] = 0     // r
+                imageData.data[i + 1] = 0 // g
+                imageData.data[i + 2] = 0 // b
+                imageData.data[i + 3] = 0 // a
+            }
+            ctx.putImageData(imageData, 0, 0)
+            
+            canvas.toBlob((blob) => {
+                const img = new Image()
+                img.onload = () => {
+                    originalImage = img
+                    resetImage()
+                    window.ui.uz.style.display = 'none'
+                    window.ui.canvas_create_ui.classList.add('hidden')
+                    window.ui.canvas.style.display = 'block'
+                    window.ui.c_clear.disabled = false
+                    window.ui.c_reset.disabled = false
+                    window.ui.c_apply.disabled = false
+                }
+                img.src = URL.createObjectURL(blob)
+            })
+        }
+
+        function loadImage(file) {
+            const reader = new FileReader()
+            reader.onload = (e) => {
+                const img = new Image()
+                img.onload = () => {
+                    originalImage = img
+                    resetImage()
+                    window.ui.uz.style.display = 'none'
+                    window.ui.canvas_create_ui.classList.add('hidden')
+                    window.ui.canvas.style.display = 'block'
+                    window.ui.c_clear.disabled = false
+                    window.ui.c_reset.disabled = false
+                    window.ui.c_apply.disabled = false
+                }
+                img.src = e.target.result
+            }
+            reader.readAsDataURL(file)
+        }
+
+        function resetImage() {
+            if (!originalImage) return
+            
+            window.ui.canvas.width = originalImage.width
+            window.ui.canvas.height = originalImage.height
+            const ctx = window.ui.canvas.getContext('2d')
+            ctx.drawImage(originalImage, 0, 0)
+            originalImageData = ctx.getImageData(0, 0, window.ui.canvas.width, window.ui.canvas.height)
+        }
+
+        // Filter management
+        window.ui.f_select.addEventListener('change', () => {
+            saveCurrentFilterCode()
+            currentFilterIdx = parseInt(window.ui.f_select.value)
+            loadFilterCode()
+        })
+
+        window.ui.f_new.addEventListener('click', () => {
+            const name = prompt('Filter name:', `Filter ${filters.length + 1}`)
+            if (!name) return
+            
+            filters.push({
+                name: name,
+                on: true,
+                data: '// New filter\nput(r, g, b, a, x, y);'
+            })
+            
+            updateFilterSelect()
+            updateFilterList()
+            currentFilterIdx = filters.length - 1
+            window.ui.f_select.value = currentFilterIdx
+            loadFilterCode()
+        })
+
+        window.ui.f_ck.addEventListener('click', () => {
+            if (filters.length === 1) {
+                alert('Cannot remove the last filter')
+                return
+            }
+            
+            if (!confirm(`Remove filter "${filters[currentFilterIdx].name}"?`)) return
+            
+            filters.splice(currentFilterIdx, 1)
+            currentFilterIdx = 0
+            
+            updateFilterSelect()
+            updateFilterList()
+            loadFilterCode()
+        })
+
+        window.ui.f_manager.addEventListener('click', () => {
+            listExpanded = !listExpanded
+            window.ui.f_list.classList.toggle('expanded', listExpanded)
+        })
+
+        window.ui.f_export.addEventListener('click', () => {
+            saveCurrentFilterCode()
+            const filter = filters[currentFilterIdx]
+            const json = JSON.stringify([filter], null, 2)
+            downloadJSON(json, `${filter.name}.json`)
+        })
+
+        window.ui.f_import.addEventListener('click', () => {
+            const input = document.createElement('input')
+            input.type = 'file'
+            input.accept = '.json'
+            input.onchange = (e) => {
+                const file = e.target.files[0]
+                const reader = new FileReader()
+                reader.onload = (e) => {
+                    try {
+                        const imported = JSON.parse(e.target.result)
+                        if (!Array.isArray(imported) || imported.length === 0) {
+                            throw new Error('Invalid filter file')
+                        }
+                        
+                        filters.push(...imported)
+                        
+                        updateFilterSelect()
+                        updateFilterList()
+                        console.log('Filter(s) imported successfully')
+                    } catch (err) {
+                        console.log('Failed to import: ' + err.message)
+                    }
+                }
+                reader.readAsText(file)
+            }
+            input.click()
+        })
+
+        window.ui.c_export.addEventListener('click', () => {
+            saveCurrentFilterCode()
+            const json = JSON.stringify(filters, null, 2)
+            downloadJSON(json, 'all-filters.json')
+        })
+
+        window.ui.c_replace.addEventListener('click', () => {
+            const input = document.createElement('input')
+            input.type = 'file'
+            input.accept = '.json'
+            input.onchange = (e) => {
+                const file = e.target.files[0]
+                const reader = new FileReader()
+                reader.onload = (e) => {
+                    try {
+                        const imported = JSON.parse(e.target.result)
+                        if (!Array.isArray(imported)) {
+                            throw new Error('Invalid filters file')
+                        }
+                        
+                        if (confirm('Replace all current filters?')) {
+                            filters = imported
+                            currentFilterIdx = 0
+                            
+                            updateFilterSelect()
+                            updateFilterList()
+                            loadFilterCode()
+                            console.log('All filters imported successfully')
+                        }
+                    } catch (err) {
+                        console.log('Failed to import: ' + err.message)
+                    }
+                }
+                reader.readAsText(file)
+            }
+            input.click()
+        })
+
+        function updateFilterSelect() {
+            window.ui.f_select.innerHTML = ''
+            filters.forEach((f, idx) => {
+                const option = document.createElement('option')
+                option.value = idx
+                option.textContent = f.name
+                option.selected = idx === currentFilterIdx
+                window.ui.f_select.appendChild(option)
+            })
+        }
+
+        function updateFilterList() {
+            window.ui.f_list.innerHTML = ''
+            filters.forEach((f, idx) => {
+                const item = document.createElement('div')
+                item.className = 'filter-item'
+                item.draggable = true
+                item.dataset.idx = idx
+                
+                item.innerHTML = `
+                    <span class="drag-handle">☰</span>
+                    <input type="checkbox" ${f.on ? 'checked' : ''}>
+                    <input type="text" value="${f.name}">
+                `
+                
+                const checkbox = item.querySelector('input[type="checkbox"]')
+                checkbox.addEventListener('change', () => {
+                    f.on = checkbox.checked
+                })
+                
+                const nameInput = item.querySelector('input[type="text"]')
+                nameInput.addEventListener('change', () => {
+                    f.name = nameInput.value
+                    updateFilterSelect()
+                })
+                
+                item.addEventListener('click', (e) => {
+                    if (e.target.tagName !== 'INPUT') {
+                        saveCurrentFilterCode()
+                        currentFilterIdx = idx
+                        window.ui.f_select.value = currentFilterIdx
+                        loadFilterCode()
+                    }
+                })
+                
+                // Drag and drop
+                item.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.effectAllowed = 'move'
+                    e.dataTransfer.setData('text/plain', idx)
+                })
+                
+                item.addEventListener('dragover', (e) => {
+                    e.preventDefault()
+                    e.dataTransfer.dropEffect = 'move'
+                })
+                
+                item.addEventListener('drop', (e) => {
+                    e.preventDefault()
+                    const fromIdx = parseInt(e.dataTransfer.getData('text/plain'))
+                    const toIdx = idx
+                    
+                    if (fromIdx !== toIdx) {
+                        const [moved] = filters.splice(fromIdx, 1)
+                        filters.splice(toIdx, 0, moved)
+                        updateFilterList()
+                    }
+                })
+                
+                window.ui.f_list.appendChild(item)
+            })
+        }
+
+        function saveCurrentFilterCode() {
+            filters[currentFilterIdx].data = window.ui.editor.value
+        }
+
+        function loadFilterCode() {
+            window.ui.editor.value = filters[currentFilterIdx].data
+        }
+
+        function downloadJSON(json, filename) {
+            const blob = new Blob([json], { type: 'application/json' })
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = filename
+            a.click()
+            URL.revokeObjectURL(url)
+        }
+
+        // Image controls
+        window.ui.c_clear.addEventListener('click', () => {
+            originalImage = null
+            originalImageData = null
+            window.ui.canvas.style.display = 'none'
+            window.ui.uz.style.display = 'block'
+            window.ui.canvas_create_ui.classList.remove('hidden')
+            window.ui.c_clear.disabled = true
+            window.ui.c_reset.disabled = true
+            window.ui.c_apply.disabled = true
+        })
+
+        window.ui.c_reset.addEventListener('click', resetImage)
+        window.ui.c_apply.addEventListener('click', processImage)
+
+        function processImage() {
+            if (!originalImageData) return
+            saveCurrentFilterCode()
+
+            try {
+                const ctx = window.ui.canvas.getContext('2d')
+                let currentImageData = new Uint8ClampedArray(originalImageData.data)
+                
+                const width = window.ui.canvas.width
+                const height = window.ui.canvas.height
+
+                // Apply each enabled filter in sequence
+                for (const filter of filters) {
+                    if (!filter.on) continue
+                    
+                    const outputData = ctx.createImageData(width, height)
+                    
+                    // Clear to black
+                    for (let i = 0; i < outputData.data.length; i += 4) {
+                        outputData.data[i] = 0
+                        outputData.data[i + 1] = 0
+                        outputData.data[i + 2] = 0
+                        outputData.data[i + 3] = 255
+                    }
+                    
+                    const pixels = currentImageData
+                    
+                    const put = (r, g, b, a, x, y) => {
+                        const targetX = Math.floor(x)
+                        const targetY = Math.floor(y)
+                        if (targetX >= 0 && targetX < width && targetY >= 0 && targetY < height) {
+                            const targetIndex = (targetY * width + targetX) * 4
+                            outputData.data[targetIndex] = Math.max(0, Math.min(255, r))
+                            outputData.data[targetIndex + 1] = Math.max(0, Math.min(255, g))
+                            outputData.data[targetIndex + 2] = Math.max(0, Math.min(255, b))
+                            outputData.data[targetIndex + 3] = Math.max(0, Math.min(255, a))
+                        }
+                    }
+                    
+                    const processPixel = new Function('r', 'g', 'b', 'a', 'x', 'y', 'w', 'h', 'i', 'p', 'put', filter.data)
+
+                    for (let i = 0; i < pixels.length; i += 4) {
+                        const index = i
+                        const x = (i / 4) % width
+                        const y = Math.floor((i / 4) / width)
+                        const r = pixels[i]
+                        const g = pixels[i + 1]
+                        const b = pixels[i + 2]
+                        const a = pixels[i + 3]
+
+                        try {
+                            processPixel(r, g, b, a, x, y, width, height, index, pixels, put)
+                        } catch (pixelError) {
+                            // Continue on pixel errors
+                        }
+                    }
+                    
+                    currentImageData = new Uint8ClampedArray(outputData.data)
+                }
+                
+                // Put final result on canvas
+                const finalImageData = ctx.createImageData(width, height)
+                finalImageData.data.set(currentImageData)
+                ctx.putImageData(finalImageData, 0, 0)
+
+            } catch (error) {
+                console.log(error.message)
+            }
+        }
+
+        // Right-click to download
+        window.ui.canvas.addEventListener('contextmenu', (e) => {
+            e.preventDefault()
+            window.ui.canvas.toBlob((blob) => {
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url
+                a.download = `glitched_${Date.now()}.png`
+                a.click()
+                URL.revokeObjectURL(url)
+            })
+        })
+
+        // Desktop resize functionality
+        const resizer = document.getElementById('resizer')
+        const app = document.getElementById('app')
+
+        let isResizing = false
+
+        resizer.addEventListener('mousedown', (e) => {
+            if (window.innerWidth <= 768) return
+            isResizing = true
+            document.body.style.cursor = 'col-resize'
+            e.preventDefault()
+        })
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isResizing || window.innerWidth <= 768) return
+
+            const appRect = app.getBoundingClientRect()
+            const percentage = ((e.clientX - appRect.left) / appRect.width) * 100
+            
+            if (percentage >= 20 && percentage <= 80) {
+                app.style.gridTemplateColumns = `${percentage}% ${100 - percentage}%`
+                resizer.style.left = `${percentage}%`
+            }
+        })
+
+        document.addEventListener('mouseup', () => {
+            if (isResizing) {
+                isResizing = false
+                document.body.style.cursor = 'default'
+            }
+        })
+    </script>
+</body>
+</html>
